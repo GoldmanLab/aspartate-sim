@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balancing four amino acids: a feedback inhibition simulation</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #1c2330; --muted: #5b6575; --line: #d5dae2; --panel: #f5f7fa; --bg: #ffffff;
+    --accent: #1f5fbf; --accent-ink: #ffffff; --warn: #b3261e; --ok: #1b6e3c;
+    --lys: #0072b2; --met: #b86e00; --thr: #008060; --ile: #a3338f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 6px; }
+  h2 { font-size: 1.2rem; margin: 0 0 8px; }
+  h3 { font-size: 1rem; margin: 0 0 6px; }
+  p { margin: 0 0 10px; }
+  .lede { color: var(--muted); max-width: 70ch; }
+  nav.steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 14px; }
+  nav.steps button { border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+    padding: 7px 12px; border-radius: 999px; font: inherit; font-size: .9rem; cursor: pointer; }
+  nav.steps button[aria-current="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  nav.steps button .tick { margin-left: 4px; }
+  section.card { border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 14px; background: var(--bg); }
+  section.card.soft { background: var(--panel); }
+  .predict { display: grid; gap: 8px; margin: 10px 0 6px; }
+  #predictblock .legend-note { margin: 0 0 12px; }
+  .predict fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .predict legend { float: left; width: 5.5em; font-weight: 600; padding: 0; }
+  .predict label { border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; background: var(--bg); font-size: .92rem; }
+  .predict input { position: absolute; opacity: 0; pointer-events: none; }
+  .predict label:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .predict label:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .predict label:has(input:disabled) { cursor: default; opacity: .75; }
+  button.run { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px;
+    padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.run:disabled { background: #a9b3c2; cursor: not-allowed; }
+  .hint { color: var(--muted); font-size: .9rem; margin-left: 10px; }
+  input[type=range] { width: 100%; }
+  .slider-row { display: flex; align-items: center; gap: 10px; }
+  .slider-row output { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 2.5em; text-align: right; }
+  .grid2 { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  figure { margin: 0; }
+  figcaption { font-weight: 600; margin-bottom: 4px; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: inherit; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: .85rem; color: var(--muted); font-weight: 600; }
+  td.txt, th.txt { text-align: left; }
+  tr.asp td { border-top: 2px solid var(--ink); border-bottom: 0; font-weight: 600; }
+  tr.asp .unit { font-weight: 400; color: var(--muted); }
+  .swatch { display: inline-block; width: 22px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
+  .match { color: var(--ok); font-weight: 600; } .differ { color: var(--warn); font-weight: 600; }
+  .legend-note { color: var(--muted); font-size: .88rem; margin-top: 6px; }
+  ol.discuss { margin: 6px 0 0; padding-left: 1.3em; }
+  ol.discuss li { margin-bottom: 4px; }
+  .navrow { display: flex; justify-content: space-between; margin-top: 4px; }
+  .navrow button { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; font: inherit; cursor: pointer; color: var(--ink); }
+  @media (max-width: 520px) { th, td { padding: 6px 4px; font-size: .86rem; } .swatch, .pc { display: none; } section.card { padding: 12px; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>How does a cell balance four amino acids made from one starting material?</h1>
+  <p class="lede">Bacteria and plants make lysine, methionine, threonine and isoleucine from aspartate through one branched pathway. This simulation lets you test how feedback inhibition keeps all four in balance. Work in pairs: for each step, agree on a prediction before you run it.</p>
+
+  <nav class="steps" id="stepnav" aria-label="Steps"></nav>
+
+  <section class="card soft" id="promptcard">
+    <h2 id="steptitle"></h2>
+    <div id="stepintro"></div>
+
+    <div id="predictblock">
+      <h3>Predict first: after time 40, each level will go…</h3>
+      <div class="predict" id="predict"></div>
+      <p class="legend-note">A change of less than 25% counts as “about the same”.</p>
+      <button class="run" id="runbtn">Run simulation</button>
+      <span class="hint" id="runhint"></span>
+    </div>
+
+  </section>
+
+  <div id="results" hidden>
+    <section class="card" id="slidercard" hidden>
+      <label for="feed"><b>Now vary it:</b> how much lysine arrives from outside after time 40?</label>
+      <div class="slider-row"><input type="range" id="feed" min="0" max="10" step="0.5" value="5"><output id="feedout">5</output></div>
+    </section>
+
+    <section class="card">
+      <h2>Amino acid levels over time</h2>
+      <div id="chart"></div>
+    </section>
+
+    <section class="card">
+      <h2>Where the metabolites flow</h2>
+      <div class="grid2">
+        <figure><figcaption>Just before time 40</figcaption><div id="diagBefore"></div></figure>
+        <figure><figcaption id="capAfter">At the end of the run</figcaption><div id="diagAfter"></div></figure>
+      </div>
+      <p class="legend-note">Arrow thickness shows how fast each enzyme is working. A dashed grey arrow is almost shut. “⊣ Lys” means “inhibited by lysine”. Numbers are concentrations in arbitrary units.</p>
+    </section>
+
+    <section class="card">
+      <h2>Before and after</h2>
+      <div id="tablewrap"></div>
+    </section>
+
+    <section class="card soft" id="discusscard">
+      <h2>Discuss with your partner</h2>
+      <ol class="discuss" id="discuss"></ol>
+    </section>
+  </div>
+
+  <div class="navrow">
+    <button id="prevbtn">← Previous step</button>
+    <button id="nextbtn">Next step →</button>
+  </div>
+
+</main>
+
+<script>
+"use strict";
+const AA = ["Lys", "Met", "Thr", "Ile"];
+const FULL = { Lys: "Lysine", Met: "Methionine", Thr: "Threonine", Ile: "Isoleucine" };
+const COLOR = { Lys: "#0072b2", Met: "#b86e00", Thr: "#008060", Ile: "#a3338f" };
+const DASH = { Lys: "", Met: "8 5", Thr: "2 4", Ile: "12 4 2 4" };
+const T_CHANGE = 40, T_END = 80, DT = 0.01;
+
+/* ---------- the model (same equations as the Python notebook) ---------- */
+function simulate(cfg) {
+  const V = 10, V_THIRD = 5, k = 1, use = 1, KI_LYS = 0.1, n = cfg.n || 2;
+  const inh = (x, on, Ki = 1) => on ? 1 / (1 + Math.pow(x / Ki, n)) : 1;
+  let S = 0, Lys = 0, Met = 0, Thr = 0, Ile = 0;
+  const out = { t: [], Lys: [], Met: [], Thr: [], Ile: [], before: null, after: null };
+  const steps = Math.round(T_END / DT);
+  let snap = null;
+  for (let i = 0; i < steps; i++) {
+    const t = i * DT;
+    const ph = t < T_CHANGE ? cfg.pre : cfg.post;
+    const lysF = ph.blind ? 1 : inh(Lys, ph.fb, KI_LYS);
+    const iso = cfg.single ? [3 * V * lysF]
+                           : [V * lysF, V * inh(Thr, ph.fb), V_THIRD];
+    const supply = iso.reduce((a, b) => a + b, 0);
+    const vLys = k * S * lysF, vMet = k * S * inh(Met, ph.fb);
+    const vThr = k * S * inh(Thr, ph.fb), vIle = k * Thr * inh(Ile, ph.fb);
+    S += (supply - vLys - vMet - vThr) * DT;
+    Lys += (vLys + ph.feed - use * Lys) * DT;
+    Met += (vMet - use * Met) * DT;
+    Thr += (vThr - vIle - use * Thr) * DT;
+    Ile += (vIle - use * Ile) * DT;
+    snap = { levels: { Lys, Met, Thr, Ile }, rates: { iso, vLys, vMet, vThr, vIle }, phase: ph };
+    if (i === Math.round(T_CHANGE / DT) - 1) out.before = snap;
+    if (i % 10 === 9) { out.t.push(t + DT); out.Lys.push(Lys); out.Met.push(Met); out.Thr.push(Thr); out.Ile.push(Ile); }
+  }
+  out.after = snap;
+  return out;
+}
+
+/* ---------- the guided steps ---------- */
+const NORMAL = { fb: true, feed: 0, blind: false };
+const STEPS = [
+  { title: "Step 1 · Switch feedback on",
+    intro: "<p>There is <b>no feedback inhibition</b> for the first half of this simulation. At time 40 (halfway through the simulation), feedback inhibition is switched on, so each end product now slows the enzyme that makes it. Note that this simulation allows the pathway to consume as much aspartate as the downstream enzymes can catalyze.</p>",
+    change: "feedback switched on",
+    cfg: () => ({ single: false, pre: { fb: false, feed: 0, blind: false }, post: NORMAL }),
+    discuss: ["What is the cell saving by keeping these levels low?",
+              "In the right-hand diagram, find the six “⊣” tags on the arrows. How does each one affect flux through the pathway?"] },
+  { title: "Step 2 · The cell finds free lysine", slider: true,
+    intro: "<p>This is a normal cell with <b>three versions (isozymes) of enzyme 1</b>. At time 40 its surroundings suddenly contain plenty of lysine, which the cell takes up, like a gut bacterium after its host eats.</p>",
+    change: "lysine supplied",
+    cfg: f => ({ single: false, pre: NORMAL, post: { fb: true, feed: f, blind: false } }),
+    discuss: ["Drag the slider. However much lysine arrives, what happens to threonine?",
+              "Compare the two diagrams. Which arrows did the extra lysine shut down? Which did it leave alone?"] },
+  { title: "Step 3 · A cell with only one enzyme 1", slider: true,
+    intro: "<p>Imagine a simpler cell in which a <b>single enzyme</b>, three times as active and inhibited by lysine, catalyzes the synthesis of substrate S from aspartate. At time 40, a large amount of lysine arrives, exactly as in Step 2.</p>",
+    change: "lysine supplied",
+    cfg: f => ({ single: true, pre: NORMAL, post: { fb: true, feed: f, blind: false } }),
+    discuss: ["What will likely be the outcome of the cell?",
+              "Why does the real cell use three isozymes?"] },
+  { title: "Step 4 · Enzymes that cannot sense lysine",
+    intro: "<p>In every run so far, lysine has been the scarcest of the four amino acids. This is the case in cereal crops such as maize. In order to increase the nutritional content of crop plants, including maize, soybean, and canola, scientists have modified them with biosynthesis enzymes that are <b>insensitive to lysine</b>. To explore this process, at time 40, this cell's lysine-sensitive enzymes are swapped for lysine-blind versions.</p>",
+    change: "enzymes made lysine-blind",
+    cfg: () => ({ single: false, pre: NORMAL, post: { fb: true, feed: 0, blind: true } }),
+    discuss: ["In this simulation, there is only a slight loss in the concentrations of methionine, threonine, and isoleucine. Why then might it benefit a real (unmodified) organism to keep free lysine so low?"] }
+];
+
+const state = { step: 0, preds: STEPS.map(() => ({})), revealed: STEPS.map(() => false), feed: STEPS.map(() => 5) };
+const $ = id => document.getElementById(id);
+const fmt = v => v.toFixed(2);
+function classify(pct) { return pct > 25 ? "up" : pct < -25 ? "down" : "same"; }
+const SHORT = { up: "up", same: "same", down: "down" };
+const WENT = { up: "went up", same: "stayed the same", down: "went down" };
+
+/* ---------- drawing helpers ---------- */
+function arrow(x1, y1, x2, y2, rate, cap) {
+  const len = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+  const shut = rate < 0.25;
+  const w = shut ? 1.5 : Math.min(cap || 16, 1.5 + rate * 0.95);
+  const head = Math.max(9, w * 1.25), hw = Math.max(5, w * 0.95);
+  const bx = x2 - ux * head, by = y2 - uy * head;
+  const col = shut ? "#9aa3b0" : "#3a4556";
+  return `<line x1="${x1}" y1="${y1}" x2="${bx}" y2="${by}" stroke="${col}" stroke-width="${w}" ${shut ? 'stroke-dasharray="4 4"' : ""}/>` +
+         `<polygon points="${x2},${y2} ${bx - uy * hw},${by + ux * hw} ${bx + uy * hw},${by - ux * hw}" fill="${col}"/>`;
+}
+function tag(x, y, who, ph, anchor) {
+  if (!ph.fb) return "";
+  if (!who) return `<text x="${x}" y="${y}" font-size="11" fill="#5b6575" text-anchor="${anchor || "start"}">no inhibitor</text>`;
+  const off = who === "Lys" && ph.blind;
+  const txt = off ? "blind to Lys" : "⊣ " + who;
+  return `<text x="${x}" y="${y}" font-size="11.5" font-weight="${off ? 400 : 700}" fill="${off ? "#5b6575" : "#b3261e"}" text-anchor="${anchor || "start"}">${txt}</text>`;
+}
+function node(x, y, name, val, col) {
+  const label = val == null ? name : `${name} ${fmt(val)}`;
+  const w = val == null ? 86 : 78;
+  return `<rect x="${x - w / 2}" y="${y - 14}" width="${w}" height="28" rx="6" fill="#fff" stroke="${col || "#3a4556"}" stroke-width="2"/>` +
+         `<text x="${x}" y="${y + 4.5}" font-size="13" font-weight="600" text-anchor="middle" fill="#1c2330">${label}</text>`;
+}
+function diagram(snap, single) {
+  const L = snap.levels, R = snap.rates, ph = snap.phase;
+  let s = `<svg viewBox="0 0 340 330" role="img" aria-label="Pathway diagram. Lysine ${fmt(L.Lys)}, methionine ${fmt(L.Met)}, threonine ${fmt(L.Thr)}, isoleucine ${fmt(L.Ile)}.">`;
+  if (single) {
+    s += arrow(170, 44, 170, 106, R.iso[0], 22) + tag(188, 80, "Lys", ph);
+  } else {
+    s += arrow(120, 44, 150, 106, R.iso[0]) + arrow(170, 44, 170, 106, R.iso[2]) + arrow(220, 44, 190, 106, R.iso[1]);
+    s += tag(112, 80, "Lys", ph, "end") + tag(228, 80, "Thr", ph);
+  }
+  s += arrow(150, 134, 66, 206, R.vLys) + arrow(170, 134, 170, 206, R.vMet) + arrow(190, 134, 274, 206, R.vThr) + arrow(274, 234, 274, 286, R.vIle);
+  s += tag(92, 168, "Lys", ph, "end") + tag(178, 180, "Met", ph) + tag(244, 168, "Thr", ph) + tag(284, 264, "Ile", ph);
+  if (ph.feed > 0) {
+    s += arrow(8, 258, 40, 236, Math.max(ph.feed, 0.3)) + `<text x="4" y="274" font-size="11" fill="#5b6575">from outside</text>`;
+  }
+  if (!ph.fb) s += `<text x="4" y="322" font-size="11.5" fill="#5b6575">Feedback off: no enzyme is inhibited</text>`;
+  s += node(170, 30, "Aspartate") + node(170, 120, "S", null);
+  s += node(60, 220, "Lys", L.Lys, COLOR.Lys) + node(170, 220, "Met", L.Met, COLOR.Met) + node(280, 220, "Thr", L.Thr, COLOR.Thr) + node(280, 300, "Ile", L.Ile, COLOR.Ile);
+  return s + "</svg>";
+}
+function chart(res, changeLabel) {
+  const W = Math.max(330, Math.min(680, $("chart").clientWidth || 680)), H = W < 480 ? 250 : 300;
+  const m = { l: 40, r: W < 480 ? 74 : 96, t: 18, b: 40 };
+  const pw = W - m.l - m.r, phh = H - m.t - m.b;
+  let ymax = 0; AA.forEach(a => res[a].forEach(v => { if (v > ymax) ymax = v; }));
+  const stepY = [0.5, 1, 2, 5, 10, 20, 50].find(s => ymax / s <= 6) || 100;
+  ymax = Math.max(stepY, Math.ceil(ymax / stepY) * stepY);
+  const X = t => m.l + (t / T_END) * pw, Y = v => m.t + phh - (v / ymax) * phh;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Line chart of the four amino acid concentrations from time 0 to 80.">`;
+  for (let v = 0; v <= ymax + 1e-9; v += stepY)
+    s += `<line x1="${m.l}" x2="${m.l + pw}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e3e7ed"/><text x="${m.l - 8}" y="${Y(v) + 4}" font-size="12" text-anchor="end" fill="#5b6575">${v}</text>`;
+  for (let t = 0; t <= T_END; t += 20)
+    s += `<text x="${X(t)}" y="${H - m.b + 18}" font-size="12" text-anchor="middle" fill="#5b6575">${t}</text>`;
+  s += `<text x="${m.l + pw / 2}" y="${H - 4}" font-size="12" text-anchor="middle" fill="#5b6575">time</text>`;
+  s += `<text transform="translate(13 ${m.t + phh / 2}) rotate(-90)" font-size="12" text-anchor="middle" fill="#5b6575">concentration</text>`;
+  s += `<line x1="${X(T_CHANGE)}" x2="${X(T_CHANGE)}" y1="${m.t}" y2="${m.t + phh}" stroke="#5b6575" stroke-dasharray="5 4"/>`;
+  s += `<text x="${X(T_CHANGE) - 6}" y="${m.t + phh - 7}" font-size="12" text-anchor="end" fill="#5b6575">${changeLabel} →</text>`;
+  AA.forEach(a => {
+    const pts = res.t.map((t, i) => `${X(t).toFixed(1)},${Y(res[a][i]).toFixed(1)}`).join(" ");
+    s += `<polyline points="${X(0)},${Y(0)} ${pts}" fill="none" stroke="${COLOR[a]}" stroke-width="2.5" stroke-dasharray="${DASH[a]}" stroke-linejoin="round"/>`;
+  });
+  const labs = AA.map(a => ({ a, y: Y(res.after.levels[a]) })).sort((p, q) => p.y - q.y);
+  for (let i = 1; i < labs.length; i++) if (labs[i].y - labs[i - 1].y < 15) labs[i].y = labs[i - 1].y + 15;
+  const over = labs[labs.length - 1].y - (m.t + phh + 4);
+  if (over > 0) labs.forEach(l => { l.y -= over; });
+  labs.forEach(l => { s += `<text x="${m.l + pw + 8}" y="${l.y + 4}" font-size="13" font-weight="700" fill="${COLOR[l.a]}">${l.a} ${fmt(res.after.levels[l.a])}</text>`; });
+  return s + "</svg>";
+}
+function table(res, preds) {
+  const showPred = preds && Object.keys(preds).length === AA.length;
+  let h = `<table><thead><tr><th>Amino acid</th><th>Before</th><th>After</th><th>Change</th>${showPred ? '<th class="txt pc">You predicted</th><th class="txt">Result</th>' : ""}</tr></thead><tbody>`;
+  AA.forEach(a => {
+    const b = res.before.levels[a], f = res.after.levels[a];
+    const pct = b > 1e-9 ? 100 * (f - b) / b : 0, cls = classify(pct);
+    h += `<tr><td><span class="swatch" style="border-top-color:${COLOR[a]};border-top-style:solid"></span>${FULL[a]}</td>` +
+         `<td>${fmt(b)}</td><td>${fmt(f)}</td><td>${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}%</td>`;
+    if (showPred) {
+      const ok = preds[a] === cls;
+      h += `<td class="txt pc">${SHORT[preds[a]]}</td><td class="txt"><span class="${ok ? "match" : "differ"}">${ok ? "✓ matched" : "✗ " + WENT[cls]}</span></td>`;
+    }
+    h += "</tr>";
+  });
+  const sum = r => r.iso.reduce((x, y) => x + y, 0);
+  const ab = sum(res.before.rates), af = sum(res.after.rates), ap = ab > 1e-9 ? 100 * (af - ab) / ab : 0;
+  h += `<tr class="asp"><td>Aspartate consumed <span class="unit">(per unit of time)</span></td><td>${fmt(ab)}</td><td>${fmt(af)}</td>` +
+       `<td>${ap >= 0 ? "+" : "−"}${Math.abs(ap).toFixed(0)}%</td>${showPred ? '<td class="pc"></td><td></td>' : ""}</tr>`;
+  return h + `</tbody></table>`;
+}
+
+/* ---------- page logic ---------- */
+function currentCfg() {
+  const st = STEPS[state.step];
+  return { cfg: st.cfg(state.feed[state.step]), change: st.change };
+}
+function drawResults() {
+  const st = STEPS[state.step], { cfg, change } = currentCfg();
+  const res = simulate(cfg);
+  $("chart").innerHTML = chart(res, change);
+  $("diagBefore").innerHTML = diagram(res.before, cfg.single);
+  $("diagAfter").innerHTML = diagram(res.after, cfg.single);
+  $("tablewrap").innerHTML = table(res, state.preds[state.step]);
+}
+function renderPredict() {
+  const i = state.step, locked = state.revealed[i];
+  $("predict").innerHTML = AA.map(a =>
+    `<fieldset><legend>${FULL[a]}</legend>` + ["up", "same", "down"].map(v =>
+      `<label><input type="radio" name="p_${a}" value="${v}" ${state.preds[i][a] === v ? "checked" : ""} ${locked ? "disabled" : ""}>${{ up: "↑ up", same: "→ about the same", down: "↓ down" }[v]}</label>`).join("") + `</fieldset>`).join("");
+  updateRunBtn();
+}
+function updateRunBtn() {
+  const i = state.step, left = AA.length - Object.keys(state.preds[i]).length;
+  $("runbtn").disabled = left > 0 || state.revealed[i];
+  $("runbtn").textContent = state.revealed[i] ? "Simulation run" : "Run simulation";
+  $("runhint").textContent = state.revealed[i] ? "" : left > 0 ? `Make ${left} more prediction${left > 1 ? "s" : ""} first.` : "Predictions locked in once you run.";
+}
+function render() {
+  const i = state.step, st = STEPS[i];
+  $("stepnav").innerHTML = STEPS.map((s, j) =>
+    `<button data-step="${j}" aria-current="${j === i}">${s.title.split(" · ")[0]}${state.revealed[j] ? '<span class="tick" aria-label="done">✓</span>' : ""}</button>`).join("");
+  $("steptitle").textContent = st.title;
+  $("stepintro").innerHTML = st.intro;
+  renderPredict();
+  const show = state.revealed[i];
+  $("results").hidden = !show;
+  $("slidercard").hidden = !(st.slider && state.revealed[i]);
+  $("feed").value = state.feed[i]; $("feedout").textContent = state.feed[i];
+  $("discuss").innerHTML = st.discuss.map(q => `<li>${q}</li>`).join("");
+  $("prevbtn").style.visibility = i === 0 ? "hidden" : "visible";
+  $("nextbtn").style.visibility = i === STEPS.length - 1 ? "hidden" : "visible";
+  if (show) drawResults();
+}
+$("stepnav").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { state.step = +b.dataset.step; render(); window.scrollTo({ top: 0 }); } });
+$("prevbtn").addEventListener("click", () => { state.step--; render(); window.scrollTo({ top: 0 }); });
+$("nextbtn").addEventListener("click", () => { state.step++; render(); window.scrollTo({ top: 0 }); });
+$("predict").addEventListener("change", e => { state.preds[state.step][e.target.name.slice(2)] = e.target.value; updateRunBtn(); });
+$("runbtn").addEventListener("click", () => { state.revealed[state.step] = true; render(); $("results").scrollIntoView({ behavior: "smooth", block: "start" }); });
+$("feed").addEventListener("input", e => { state.feed[state.step] = +e.target.value; $("feedout").textContent = e.target.value; drawResults(); });
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (!$("results").hidden) drawResults(); }, 150); });
+render();
+</script>
+</body>
+</html>
